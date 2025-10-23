@@ -1,0 +1,70 @@
+ts = 1e-9;
+T  = 1e-5;
+tau = 1e-6;
+t = 0:ts:T;
+x = zeros(size(t));
+x(1 : round(tau/ts)) = 1;
+figure;
+plot(t, x, "LineWidth", 2);
+xlim([0, T]), ylim([-0.2, 1.2]);
+xlabel("t"), ylabel("x"), title("t-x, Transmitted");
+R = 450;
+c = 3e8;
+td = 2 * R / c;
+alpha = 0.5;
+y = zeros(size(t));
+startIdx = round(td / ts);
+endIdx   = startIdx + round(tau / ts) - 1;
+y(startIdx:endIdx) = alpha;
+figure;
+plot(t, y, "LineWidth", 2);
+xlim([0, T]), ylim([-0.2, 1.2]);
+xlabel("t"), ylabel("y"), title("t-y: Received");
+corrOutput = xcorr(y, x);
+lags = (-length(y)+1):(length(y)-1);
+lags = lags * ts;       
+figure;
+plot(lags, corrOutput, 'LineWidth', 2);
+xlabel('Lag'),ylabel('Correlation'), title('Corr');
+[~, maxIdx] = max(corrOutput);
+td_est = lags(maxIdx);
+R_est = td_est * c / 2;
+fprintf('Distance: %.2f m\n', R_est);
+noiseLevel = 0;
+noiseIncrement = 0.1;
+numIterations = 100;
+distanceTrue = R;
+maxAllowedError = 10;
+errorValues = [];
+estimatedDistances = [];
+noiseLevels = [];
+idx = 1;
+while true
+    totalError = 0;
+    totalDistance = 0;
+    for i = 1:numIterations
+        noisyY = y + noiseLevel * randn(size(y));
+        corrOut = xcorr(noisyY, x);
+        [~, maxIdx] = max(corrOut);
+        td_noisy = (maxIdx - length(y)) * ts;
+        R_noisy = td_noisy * c / 2;
+        totalError = totalError + abs(R_noisy - distanceTrue);
+        totalDistance = totalDistance + R_noisy;
+    end
+    avgError = totalError / numIterations;
+    avgDistance = totalDistance / numIterations;
+    errorValues(idx) = avgError;
+    estimatedDistances(idx) = avgDistance;
+    noiseLevels(idx) = noiseLevel;
+    if noiseLevel >= 10
+        break;
+    end
+    noiseLevel = noiseLevel + noiseIncrement;
+    idx = idx + 1;
+end
+subplot(1, 2, 1);
+plot(noiseLevels, errorValues, 'LineWidth', 2);
+xlabel('Noise'), ylabel('Average Error'),title('Error-Noise');
+subplot(1, 2, 2);
+plot(noiseLevels, estimatedDistances, 'LineWidth', 2);
+xlabel('Noise'), ylabel('Estimated'),title('Estimated-Noise');
